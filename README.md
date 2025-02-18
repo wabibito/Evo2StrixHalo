@@ -122,6 +122,10 @@ outputs, embeddings = evo2_model.forward(input_ids, return_embeddings=True, laye
 print('Embeddings shape: ', embeddings[layer_name].shape)
 ```
 
+### Notebooks
+
+- `notebooks/brca1/brca1_zero_shot_vep.ipynb`: Zero-shot *BRCA1* variant effect prediction with Evo 2.
+
 ## Dataset
 
 The OpenGenome2 dataset used for pretraining Evo2 is available at [Hugging Face datasets](https://huggingface.co/datasets/LongSafari/open-genome). Data is available either as raw fastas or as JSONL files which include preprocessing and data augmentation.
