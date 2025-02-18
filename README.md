@@ -68,7 +68,7 @@ Evo 2 can be used to score the likelihood of DNA sequence.
 import torch
 from evo2 import Evo2
 
-evo2_model = Evo2('evo2_40b')
+evo2_model = Evo2('evo2_7b')
 evo2_model.model.eval()
 
 sequence = 'ACGT'

@@ -89,7 +89,7 @@ class Evo2:
         finally:
             for handle in handles:
                 handle.remove()
-                
+
     def __call__(self, input_ids, return_embeddings=False, layer_names=None):
         return self.forward(input_ids, return_embeddings, layer_names)
 
@@ -183,7 +183,7 @@ class Evo2:
             )
         # If file is split, download and join parts
         except:
-            print(f"Attempting to load split parts for {filename}")
+            print(f"Loading checkpoint shards for {filename}")
             # If file is split, get the first part's directory to use the same cache location
             weights_path = os.path.join(os.path.dirname(os.environ['HF_HOME']), filename)
             if os.path.exists(weights_path):
@@ -208,6 +208,14 @@ class Evo2:
                                 chunk = infile.read(8192*1024)
                                 if not chunk: break
                                 outfile.write(chunk)
+                
+                # Cleaning up the parts
+                for part in parts:
+                    try:
+                        os.remove(part)
+                    except OSError as e:
+                        print(f"Error removing {part}: {e}")
+                    print("Cleaned up shards, final checkpoint saved to", weights_path)
 
         config = dotdict(yaml.load(open(config_path), Loader=yaml.FullLoader))
         model = StripedHyena(config)
