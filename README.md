@@ -30,9 +30,11 @@ Evo 2 is based on [Striped Hyena 2](https://github.com/Zymrael/vortex). A CUDA-c
 Follow the commands below to install.
 
 ```bash
+conda create -n evo2 python=3.12 -y && conda activate evo2
 git clone https://github.com/arcinstitute/evo2.git
 cd evo2/
-conda create -n evo2 python=3.12 -y && conda activate evo2
+git submodule init vortex
+git submodule update vortex
 pip install .
 ```
 
@@ -75,7 +77,7 @@ input_ids = torch.tensor(
     dtype=torch.int,
 ).unsqueeze(0).to('cuda:0')
 
-outputs, _ = evo2_model.forward(input_ids)
+outputs, _ = evo2_model(input_ids)
 logits = outputs[0]
 
 print('Logits: ', logits)

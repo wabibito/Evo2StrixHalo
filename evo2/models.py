@@ -1,7 +1,9 @@
 import torch
 
+import huggingface_hub
 from huggingface_hub import hf_hub_download
 import yaml
+import os
 from typing import List, Tuple, Dict, Union
 from functools import partial
 
@@ -14,7 +16,7 @@ from evo2.scoring import score_sequences, score_sequences_rc
 from evo2.utils import MODEL_NAMES, HF_MODEL_NAME_MAP, CONFIG_MAP
 
 class Evo2:
-    def __init__(self, model_name: str = MODEL_NAMES[1], config_path: str = None, local_path: str = None):
+    def __init__(self, model_name: str = MODEL_NAMES[1], local_path: str = None):
         """
         Load an Evo 2 checkpoint.
 
@@ -28,24 +30,21 @@ class Evo2:
         Evo 2 40b is too large to fit on a single H100 GPU, so needs multiple GPUs.
         You can change where HuggingFace downloads to by setting the HF_HOME environment variable.
         """
+        if model_name not in MODEL_NAMES:
+            raise ValueError(
+                f'Invalid model name {model_name}. Should be one of: '
+                f'{", ".join(MODEL_NAMES)}.'
+            )
+
+        config_path = CONFIG_MAP[model_name]
+
         if local_path is not None:
-            if config_path is None:
-                raise ValueError("config_path must be specified if local_path is provided.")
             self.model = self.load_evo2_model(None, config_path, local_path)
-        
         else:
-
-            if model_name not in MODEL_NAMES:
-                raise ValueError(
-                    f'Invalid model name {model_name}. Should be one of: '
-                    f'{", ".join(MODEL_NAMES)}.'
-                )
-
-            config_path = CONFIG_MAP[model_name]
             self.model = self.load_evo2_model(model_name, config_path)
         
         self.tokenizer = CharLevelTokenizer(512)
-            
+    
     def forward(self, input_ids, return_embeddings=False, layer_names=None):
         """
         Forward pass with optional embedding extraction.
@@ -90,6 +89,9 @@ class Evo2:
         finally:
             for handle in handles:
                 handle.remove()
+                
+    def __call__(self, input_ids, return_embeddings=False, layer_names=None):
+        return self.forward(input_ids, return_embeddings, layer_names)
 
     def score_sequences(
             self,
@@ -167,7 +169,7 @@ class Evo2:
             print(f"Loading config from {config_path}...")
             config = dotdict(yaml.load(open(config_path), Loader=yaml.FullLoader))
             model = StripedHyena(config)
-            load_checkpoint(model, weights_path)
+            load_checkpoint(model, local_path)
             return model
         
         hf_model_name = HF_MODEL_NAME_MAP[model_name]
@@ -181,31 +183,31 @@ class Evo2:
             )
         # If file is split, download and join parts
         except:
-            weights_path = "/tmp/" + filename
-            parts = []
-            part_num = 0
-            
-            # First download all parts
-            while True:
-                try:
-                    part_path = hf_hub_download(
-                        repo_id=hf_model_name,
-                        filename=f"{filename}.part{part_num}",
-                    )
-                    parts.append(part_path)
-                    part_num += 1
-                except:
-                    break
-                    
-            # Then join them with proper buffer handling
-            with open(weights_path, 'wb') as outfile:
-                for part in parts:
-                    with open(part, 'rb') as infile:
-                        while True:
-                            chunk = infile.read(8192*1024)  # 8MB chunks
-                            if not chunk:
-                                break
-                            outfile.write(chunk)
+            print(f"Attempting to load split parts for {filename}")
+            # If file is split, get the first part's directory to use the same cache location
+            weights_path = os.path.join(os.path.dirname(os.environ['HF_HOME']), filename)
+            if os.path.exists(weights_path):
+                print(f"Found {filename}")
+            else:
+                # Download and join parts
+                parts = []
+                part_num = 0
+                while True:
+                    try:
+                        part_path = hf_hub_download(repo_id=hf_model_name, filename=f"{filename}.part{part_num}")
+                        parts.append(part_path)
+                        part_num += 1
+                    except huggingface_hub.errors.EntryNotFoundError:
+                        break
+
+                # Join in the same directory 
+                with open(weights_path, 'wb') as outfile:
+                    for part in parts:
+                        with open(part, 'rb') as infile:
+                            while True:
+                                chunk = infile.read(8192*1024)
+                                if not chunk: break
+                                outfile.write(chunk)
 
         config = dotdict(yaml.load(open(config_path), Loader=yaml.FullLoader))
         model = StripedHyena(config)
