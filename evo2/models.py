@@ -14,25 +14,36 @@ from evo2.scoring import score_sequences, score_sequences_rc
 from evo2.utils import MODEL_NAMES, HF_MODEL_NAME_MAP, CONFIG_MAP
 
 class Evo2:
-    def __init__(self, model_name: str = MODEL_NAMES[1]):
+    def __init__(self, model_name: str = MODEL_NAMES[1], config_path: str = None, local_path: str = None):
         """
         Load an Evo 2 checkpoint.
-        Automatically downloads checkpoint from huggingface if it does not exist.
 
-        Evo 2 40b is too large to fit on a single H100 GPU, so needs multiple GPUs.
+        Uses local_path if specified, otherwise checks if in local HuggingFace ~cache.
+        Automatically downloads checkpoint from HuggingFace if it does not exist locally.
+
         Vortex automatically handles device placement on CUDA, and splits model across multiple GPUs if available.
+        For models split across multiple GPUs, you can specify which GPUs to use with CUDA_VISIBLE_DEVICES. If using multi-gpu, do not use .to(device) manually.
+
+        Notes:
+        Evo 2 40b is too large to fit on a single H100 GPU, so needs multiple GPUs.
+        You can change where HuggingFace downloads to by setting the HF_HOME environment variable.
         """
-
-        if model_name not in MODEL_NAMES:
-            raise ValueError(
-                f'Invalid model name {model_name}. Should be one of: '
-                f'{", ".join(MODEL_NAMES)}.'
-            )
-
-        config_path = CONFIG_MAP[model_name]
+        if local_path is not None:
+            if config_path is None:
+                raise ValueError("config_path must be specified if local_path is provided.")
+            self.model = self.load_evo2_model(None, config_path, local_path)
         
-        # Load the model.
-        self.model = self.load_evo2_model(model_name, config_path)
+        else:
+
+            if model_name not in MODEL_NAMES:
+                raise ValueError(
+                    f'Invalid model name {model_name}. Should be one of: '
+                    f'{", ".join(MODEL_NAMES)}.'
+                )
+
+            config_path = CONFIG_MAP[model_name]
+            self.model = self.load_evo2_model(model_name, config_path)
+        
         self.tokenizer = CharLevelTokenizer(512)
             
     def forward(self, input_ids, return_embeddings=False, layer_names=None):
@@ -53,7 +64,7 @@ class Evo2:
         
         if return_embeddings:
             if layer_names is None:
-                raise ValueError("layer_names must be specified when return_embeddings=True")
+                raise ValueError("layer_names must be specified when return_embeddings=True. Look at evo2_model.model.state_dict().keys() to see available layers.")
                 
             def hook_fn(layer_name):
                 def hook(_, __, output):
@@ -120,10 +131,10 @@ class Evo2:
         """
         Generate sequences from a list of prompts.
 
+        force_prompt_threshold: If specified, avoids OOM errors through teacher forcing if the prompt is longer than this threshold.
+
         If force_prompt_threshold is none, sets default assuming 1xH100 (evo2_7b) and 2xH100 (evo2_40b) to help avoid OOM errors.
         """
-        if force_prompt_threshold is None:
-            force_prompt_threshold = 8192 if '7b' in self.model.config.model_name else 5000
 
         with torch.no_grad():
             output = vortex_generate(
@@ -145,14 +156,23 @@ class Evo2:
     def load_evo2_model(
             self,
             model_name: str = MODEL_NAMES[1],
-            config_path: str = 'vortex/configs/evo2_7b.yml',
+            config_path: str = None,
+            local_path: str = None,
     ):
         """
         Load HuggingFace checkpoint using StripedHyena 2.
         """
+        if local_path is not None:
+            print(f"Loading model from {local_path}...")
+            print(f"Loading config from {config_path}...")
+            config = dotdict(yaml.load(open(config_path), Loader=yaml.FullLoader))
+            model = StripedHyena(config)
+            load_checkpoint(model, weights_path)
+            return model
+        
         hf_model_name = HF_MODEL_NAME_MAP[model_name]
         filename = f"{model_name}.pt"
-        
+                
         # First try normal download
         try:
             weights_path = hf_hub_download(
@@ -162,23 +182,32 @@ class Evo2:
         # If file is split, download and join parts
         except:
             weights_path = "/tmp/" + filename
+            parts = []
             part_num = 0
+            
+            # First download all parts
             while True:
                 try:
-                    part = hf_hub_download(
+                    part_path = hf_hub_download(
                         repo_id=hf_model_name,
                         filename=f"{filename}.part{part_num}",
                     )
-                    with open(weights_path, 'ab') as outfile:
-                        with open(part, 'rb') as infile:
-                            outfile.write(infile.read())
+                    parts.append(part_path)
                     part_num += 1
                 except:
                     break
+                    
+            # Then join them with proper buffer handling
+            with open(weights_path, 'wb') as outfile:
+                for part in parts:
+                    with open(part, 'rb') as infile:
+                        while True:
+                            chunk = infile.read(8192*1024)  # 8MB chunks
+                            if not chunk:
+                                break
+                            outfile.write(chunk)
 
         config = dotdict(yaml.load(open(config_path), Loader=yaml.FullLoader))
         model = StripedHyena(config)
         load_checkpoint(model, weights_path)
-
-        print(f"Loaded model {model_name} from {weights_path}!")
         return model
