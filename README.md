@@ -14,9 +14,10 @@ We describe Evo 2 in the preprint:
   - [Installation](#installation)
 - [Checkpoints](#checkpoints)
 - [Usage](#usage)
-  - [Usage](#inference)
-  - [Usage](#embeddings)
-  - [Usage](#generation)
+  - [Forward](#forward)
+  - [Embeddings](#embeddings)
+  - [Generation](#generation)
+  - [Notebooks](#notebooks)
 - [Dataset](#dataset)
 - [Training Code](#dataset)
 - [Citation](#citation)
@@ -30,20 +31,16 @@ Evo 2 is based on [StripedHyena 2](https://github.com/Zymrael/vortex). A CUDA-ca
 
 ### Installation
 
-Follow the commands below to install.
+Follow the commands below to install. We recommend using a new conda environment with python 3.12.
 
 ```bash
-conda create -n evo2 python=3.12 -y && conda activate evo2
-git clone https://github.com/arcinstitute/evo2.git
-cd evo2/
-git submodule init vortex
-git submodule update vortex
-pip install .
+pip install git+https://github.com/arcinstitute/evo2.git
 ```
 
 After installation, check that the installation was correct by running a test
+
 ```
-python ./test/test_evo2.py --model_name evo2_7b
+python -m test.test_evo2 --model_name evo2_7b
 ```
 
 ## Checkpoints
@@ -63,9 +60,9 @@ To use Evo 2 40B, you will need multiple GPUs. Vortex automatically handles devi
 
 Below are simple examples of how to download Evo 2 and use it locally using Python.
 
-### Inference
+### Forward
 
-Evo 2 can be used to score the likelihood of DNA sequence.
+Evo 2 can be used to score the likelihoods across a DNA sequence.
 
 ```python
 import torch
@@ -129,6 +126,10 @@ We provide an example [notebook](https://github.com/ArcInstitute/evo2/blob/main/
 - Performing zero-shot *BRCA1* variant effect predictions using Evo 2
 - Reference vs alternative allele normalization
 
+### Very long sequences
+
+Vortex supports forced prompts to compute over very long sequences via teacher prompting. Please note that forward pass on long sequences may currently be slow. We are actively working on optimizing performance for long sequence processing.
+
 ## Dataset
 
 The OpenGenome2 dataset used for pretraining Evo2 is available on [HuggingFace ](https://huggingface.co/datasets/arcinstitute/opengenome2). Data is available either as raw fastas or as JSONL files which include preprocessing and data augmentation.
@@ -136,6 +137,9 @@ The OpenGenome2 dataset used for pretraining Evo2 is available on [HuggingFace ]
 ## Training Code
 
 Evo 2 was trained using [Savanna](https://github.com/Zymrael/savanna), an open source framework for training alternative architectures.
+
+### More
+
 
 ## Citation
 
