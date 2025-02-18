@@ -2,7 +2,7 @@
 
 </div>
 
-Evo 2 is a state of the art DNA language model for long context modeling and design. Evo 2 uses the [StripedHyena 2](https://github.com/Zymrael/vortex) architecture and is pretrained using [savanna](https://github.com/Zymrael/savanna) on 2048 GPUs. Evo 2 models DNA sequences at single-nucleotide resolution with near linear memory and compute scaling with length. Evo 2 is trained on [OpenGenome2](https://huggingface.co/datasets/arcinstitute/opengenome2), a dataset containing 8.8 trillion tokens from all domains of life.
+Evo 2 is a state of the art DNA language model for long context modeling and design. Evo 2 uses the [Striped Hyena 2](https://github.com/Zymrael/vortex) architecture and is pretrained using [savanna](https://github.com/Zymrael/savanna) on 2048 GPUs. Evo 2 models DNA sequences at single-nucleotide resolution at up to 1 million base pair context length. Evo 2 is trained on [OpenGenome2](https://huggingface.co/datasets/arcinstitute/opengenome2), a dataset containing 8.8 trillion tokens from all domains of life.
 
 We describe Evo 2 in the paper ["Genome modeling and design across all domains of life with Evo 2"]().
 
@@ -22,7 +22,7 @@ We describe Evo 2 in the paper ["Genome modeling and design across all domains o
 
 ### Requirements
 
-Evo 2 is based on [StripedHyena2](https://github.com/Zymrael/vortex). Evo 2 uses [FlashAttention-2](https://github.com/Dao-AILab/flash-attention), which may not work on all GPU architectures. Please consult the [FlashAttention GitHub repository](https://github.com/Dao-AILab/flash-attention#installation-and-features) for the current list of supported GPUs.
+Evo 2 is based on [Striped Hyena 2](https://github.com/Zymrael/vortex). Evo 2 uses [FlashAttention-2](https://github.com/Dao-AILab/flash-attention), which may not work on all GPU architectures. Please consult the [FlashAttention GitHub repository](https://github.com/Dao-AILab/flash-attention#installation-and-features) for the current list of supported GPUs.
 
 ### Installation
 
@@ -41,6 +41,7 @@ python ./test/test_evo2.py --model_name evo2_7b
 ```
 
 ## Checkpoints
+
 We provide the following model checkpoints, hosted on HuggingFace:
 | Checkpoint Name                        | Description |
 |----------------------------------------|-------------|
@@ -48,45 +49,88 @@ We provide the following model checkpoints, hosted on HuggingFace:
 | `evo2_7b`  | A model pretrained with 1 million context obtained through context extension of `evo2_7b_base`.|
 | `evo2_40b_base`  | A model pretrained with 8192 context length.|
 | `evo2_7b_base`  | A model pretrained with 8192 context length.|
-| `evo2_1b_base`  | A smaller model pretrained with 8192 context length|
+| `evo2_1b_base`  | A smaller model pretrained with 8192 context length.|
 
 ## Usage
 
-Below is an example of how to download Evo 2 and use it locally using Python.
+Below are simple examples of how to download Evo 2 and use it locally using Python.
+
+### Inference
+
+Evo 2 can be used to score the likelihood of DNA sequence.
 
 ```python
-from evo2 import Evo2
 import torch
+from evo2 import Evo2
 
-evo2_7b = Evo2('evo2_7b')
-model, tokenizer = evo2_7b.model, evo2_7b.tokenizer
-model.eval()
+evo2_model = Evo2('evo2_7b')
+evo2_model.model.eval()
 
 sequence = 'ACGT'
 input_ids = torch.tensor(
-    tokenizer.tokenize(sequence),
+    evo2_model.tokenizer.tokenize(sequence),
     dtype=torch.int,
 ).unsqueeze(0).to('cuda:0')
 
-with torch.no_grad():
-    logits, _ = model(input_ids)
+outputs, _ = evo2_model.forward(input_ids)
+logits = outputs[0]
 
 print('Logits: ', logits)
 print('Shape (batch, length, vocab): ', logits.shape)
 ```
 
-### Examples
+### Generation
+
+Evo 2 can generate DNA sequence based on prompts.
+
+```python
+from evo2 import Evo2
+
+evo2_model = Evo2('evo2_7b')
+evo2_model.model.eval()
+
+with torch.no_grad():
+  output = evo2_model.generate(prompt_seqs=["ACGT"], n_tokens=400, temperature=1.0, top_k=4)
+print(output.sequences[0])
+```
+
+### Embeddings
+
+Evo 2 embeddings can be saved for use downstream.
+
+```python
+import torch
+from evo2 import Evo2
+
+evo2_model = Evo2('evo2_7b')
+evo2_model.model.eval()
+
+sequence = 'ACGT'
+input_ids = torch.tensor(
+    evo2_model.tokenizer.tokenize(sequence),
+    dtype=torch.int,
+).unsqueeze(0).to('cuda:0')
+
+outputs, embeddings = evo2_model.forward(input_ids, return_embeddings=True, layer_names=['blocks.28.mlp.l3'])
+
+print('Embeddings shape: ', embeddings.shape)
+```
+
+
+### Example Notebooks
 
 TODO
 
 ### Dataset
 
-The OpenGenome2 dataset used for pretraining Evo2 is available at [Hugging Face datasets](https://huggingface.co/datasets/LongSafari/open-genome).
+The OpenGenome2 dataset used for pretraining Evo2 is available at [Hugging Face datasets](https://huggingface.co/datasets/LongSafari/open-genome). Data is available either as raw fastas or as JSONL files which include preprocessing and data augmentation.
 
 ### Training Code
 
 Evo 2 was trained using [savanna](https://github.com/Zymrael/savanna), an open source framework for training alternative architectures.
 
 ### Citation
+
+If you find these models useful for your research, please cite the relevant papers
 
 TODO
