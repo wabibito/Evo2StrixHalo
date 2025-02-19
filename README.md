@@ -36,7 +36,7 @@ Please clone and install from GitHub. We recommend using a conda environment wit
 ```bash
 git clone --recurse-submodules git@github.com:ArcInstitute/evo2.git
 cd evo2
-pip install .
+pip install -v .
 ```
 
 If this did not work for whatever reason, you can also install from [Vortex](https://github.com/Zymrael/vortex) and follow the instructions there. PyPi support coming soon!
