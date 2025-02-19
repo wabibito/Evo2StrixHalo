@@ -31,13 +31,15 @@ Evo 2 is based on [StripedHyena 2](https://github.com/Zymrael/vortex). A CUDA-ca
 
 ### Installation
 
-Please install directly from GitHub. We recommend using a new conda environment. Requires python>=3.11.
+Please clone and install from GitHub. We recommend using a conda environment with Pytorch. Requires python>=3.11.
 
 ```bash
-git clone git@github.com:ArcInstitute/evo2.git
+git clone --recurse-submodules git@github.com:ArcInstitute/evo2.git
 cd evo2
 pip install .
 ```
+
+If this did not work for whatever reason, you can also install from [Vortex](https://github.com/Zymrael/vortex) and follow the instructions there. PyPi support coming soon!
 
 You can check that the installation was correct by running a test.
 
@@ -130,7 +132,7 @@ We provide an example [notebook](https://github.com/ArcInstitute/evo2/blob/main/
 
 ### Very long sequences
 
-Vortex supports forced prompts to compute over very long sequences via teacher prompting. Please note that forward pass on long sequences may currently be slow. We are actively working on optimizing performance for long sequence processing.
+We are actively working on optimizing performance for long sequence processing. Vortex can currently compute over very long sequences via teacher prompting. However please note that forward pass on long sequences may currently be slow. 
 
 ## Dataset
 
@@ -140,11 +142,17 @@ The OpenGenome2 dataset used for pretraining Evo2 is available on [HuggingFace ]
 
 Evo 2 was trained using [Savanna](https://github.com/Zymrael/savanna), an open source framework for training alternative architectures.
 
-### More
-
-
 ## Citation
 
 If you find these models useful for your research, please cite the relevant papers
 
-TODO
+```
+@article{brixi2025genome,
+  title = {Genome modeling and design across all domains of life with Evo 2},
+  author = {Brixi, Garyk and Durrant, Matthew G. and Ku, Jerome and Poli, Michael and Brockman, Greg and Chang, Daniel and Gonzalez, Gabriel A. and King, Samuel H. and Li, David B. and Merchant, Aditi T. and Naghipourfar, Mohsen and Nguyen, Eric and Ricci-Tam, Chiara and Romero, David W. and Sun, Gwanggyu and Taghibakshi, Ali and Vorontsov, Anton and Yang, Brandon and Deng, Myra and Gorton, Liv and Nguyen, Nam and Wang, Nicholas K. and Adams, Etowah and Baccus, Stephen A. and Dillmann, Steven and Ermon, Stefano and Guo, Daniel and Ilango, Rajesh and Janik, Ken and Lu, Amy X. and Mehta, Reshma and Mofrad, Mohammad R.K. and Ng, Madelena Y. and Pannu, Jaspreet and Ré, Christopher and Schmok, Jonathan C. and St. John, John and Sullivan, Jeremy and Zhu, Kevin and Zynda, Greg and Balsam, Daniel and Collison, Patrick and Costa, Anthony B. and Hernandez-Boussard, Tina and Ho, Eric and Liu, Ming-Yu and McGrath, Thomas and Powell, Kimberly and Burke, Dave P. and Goodarzi, Hani and Hsu, Patrick D. and Hie, Brian L.},
+  journal = {Evo 2},
+  year = {2025},
+  url = {https://arcinstitute.org/manuscripts/Evo2},
+  note = {Accessed: 2025-02-19}
+}
+```

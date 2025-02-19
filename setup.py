@@ -71,7 +71,7 @@ setup(
     name='evo2',
     version='0.1.0',
     # Only include the evo2 package; the vortex submodule is used for build purposes.
-    packages=find_packages(include=["evo2", "evo2.*"]),
+    packages=find_packages(include=["evo2", "vortex/vortex"]),
     install_requires=requirements,
     cmdclass={
         'build': CustomBuild,
