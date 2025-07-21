@@ -32,24 +32,49 @@ information.
 
 ### Requirements
 
-Evo 2 is based on [StripedHyena 2](https://github.com/Zymrael/vortex) which requires python>=3.11. Evo 2 uses [Transformer Engine](https://github.com/NVIDIA/TransformerEngine) FP8 for some layers which requires an H100 (or other GPU with compute capability ≥8.9). We are actively investigating ways to avoid this requirement.
+Evo 2 is built on the Vortex inference repo, see the [Vortex github](https://github.com/Zymrael/vortex) for more details and Docker option.
+
+**Prerequisites**
+- [Transformer Engine](https://github.com/NVIDIA/TransformerEngine) >= 2.0.0
+- [Flash Attention](https://github.com/Dao-AILab/flash-attention/tree/main) for optimized attention operations (strongly recommended)
+
+**System requirements**
+- [OS] Linux (official) or WSL2 (limited support)
+- [GPU] Requires Compute Capability 8.9+ (Ada/Hopper/Blackwell) due to FP8 being required
+- [Software]
+	- CUDA: 12.1+ (12.8+ for Blackwell) with compatible NVIDIA drivers
+	- cuDNN: 9.3+
+	- Compiler: GCC 9+ or Clang 10+ with C++17 support
+	- Python 3.12 required
+  
+Check respective githubs for more details about [Transformer Engine](https://github.com/NVIDIA/TransformerEngine) and [Flash Attention](https://github.com/Dao-AILab/flash-attention/tree/main) and how to install them.
+We recommend using conda to easily install Transformer Engine. Here is an example of how to install the prerequisites:
+```bash
+conda install -c nvidia cuda-nvcc cuda-cudart-dev
+conda install -c conda-forge transformer-engine-torch=2.3.0
+pip install flash-attn==2.8.0.post2 --no-build-isolation
+```
 
 ### Installation
 
-To install Evo 2 for inference or generation, please clone and install from GitHub. We recommend using a new conda environment with python>=3.11.
+To get started with Evo 2, install from pip or from github after installing the prerequisites.
 
+To install Evo 2:
 ```bash
-git clone --recurse-submodules git@github.com:ArcInstitute/evo2.git
+pip install evo2
+```
+
+For the latest features or to contribute:
+```bash
+git clone https://github.com/arcinstitute/evo2
 cd evo2
-pip install .
+pip install -e .
 ```
 
-If this did not work for whatever reason, you can also install from [Vortex](https://github.com/Zymrael/vortex) and follow the instructions there. PyPi support coming soon!
-
-You can check that the installation was correct by running a test.
+To verify that the installation was correct:
 
 ```
-python ./test/test_evo2.py --model_name evo2_7b
+python -m evo2.test.test_evo2_generation --model_name evo2_7b
 ```
 
 ## Checkpoints
@@ -64,6 +89,8 @@ We provide the following model checkpoints, hosted on [HuggingFace](https://hugg
 | `evo2_1b_base`  | A smaller model pretrained with 8192 context length.|
 
 To use Evo 2 40B, you will need multiple GPUs. Vortex automatically handles device placement, splitting the model across available cuda devices.
+
+Note that the 7B checkpoints can be run without FP8, thus avoiding the compute capability requirement. This can be done by modifying the configs to turn off FP8 and is not officially supported as there are numerical differences.
 
 ## Usage
 
@@ -183,7 +210,7 @@ else:
 
 ### Very long sequences
 
-We are actively working on optimizing performance for long sequence processing in Vortex. Vortex can currently compute over very long sequences via teacher prompting. However please note that forward pass on long sequences may currently be slow. You can instead use [Savanna](https://github.com/Zymrael/savanna) or [Nvidia BioNemo](https://github.com/NVIDIA/bionemo-framework) for embedding long sequences.
+You can use [Savanna](https://github.com/Zymrael/savanna) or [Nvidia BioNemo](https://github.com/NVIDIA/bionemo-framework) for embedding long sequences. Vortex can currently compute over very long sequences via teacher prompting, however please note that forward pass on long sequences may currently be slow. 
 
 ### Dataset
 
@@ -212,3 +239,4 @@ If you find these models useful for your research, please cite the relevant pape
 	journal = {bioRxiv}
 }
 ```
+

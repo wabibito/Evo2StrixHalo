@@ -1,0 +1,32 @@
+[project]
+name = "evo2"
+version = "0.3.0"
+description = "Genome modeling across all domains of life"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+authors = [
+    {name = "Evo 2 Team"},
+]
+dependencies = [
+    "biopython",
+    "huggingface_hub",
+    "torch",
+    "transformer_engine>=2.0.0",
+    "vtx>=0.0.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/arcinstitute/evo2"
+Repository = "https://github.com/arcinstitute/evo2"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["evo2*"]
+
+[tool.setuptools.package-data]
+"evo2" = ["configs/*.yml"]
+"evo2.test" = ["data/*.csv"]
