@@ -13,13 +13,13 @@ We describe Evo 2 in the preprint:
   - [Requirements](#requirements)
   - [Installation](#installation)
   - [Docker](#docker)
-- [Checkpoints](#checkpoints)
 - [Usage](#usage)
+  - [Checkpoints](#checkpoints)
   - [Forward](#forward)
   - [Embeddings](#embeddings)
   - [Generation](#generation)
-  - [Notebooks](#notebooks)
-  - [Nvidia NIM](#nvidia-nim)
+- [Notebooks](#notebooks)
+- [Nvidia NIM](#nvidia-nim)
 - [Dataset](#dataset)
 - [Training and Finetuning](#training-and-finetuning)
 - [Citation](#citation)
@@ -41,13 +41,15 @@ Evo 2 is built on the Vortex inference repo, see the [Vortex github](https://git
 
 **System requirements**
 - [OS] Linux (official) or WSL2 (limited support)
-- [GPU] Requires Compute Capability 8.9+ (Ada/Hopper/Blackwell) due to FP8 being required
+- [GPU] Requires Compute Capability 8.9+ (Ada/Hopper) for FP8 support
 - [Software]
-	- CUDA: 12.1+ (12.8+ for Blackwell) with compatible NVIDIA drivers
+	- CUDA: 12.1+ with compatible NVIDIA drivers
 	- cuDNN: 9.3+
 	- Compiler: GCC 9+ or Clang 10+ with C++17 support
 	- Python 3.12 required
-  
+
+**FP8 requirements:** The 40B and 1B models require FP8 for numerical accuracy, and low accuracy has been reported on Blackwell hardware or without FP8. The 7B models can run without FP8 by modifying the config. Always validate model outputs after configuration changes or on different hardware by using the tests.
+
 Check respective githubs for more details about [Transformer Engine](https://github.com/NVIDIA/TransformerEngine) and [Flash Attention](https://github.com/Dao-AILab/flash-attention/tree/main) and how to install them.
 We recommend using conda to easily install Transformer Engine. Here is an example of how to install the prerequisites:
 ```bash
@@ -78,6 +80,11 @@ To verify that the installation was correct:
 python -m evo2.test.test_evo2_generation --model_name evo2_7b
 ```
 
+For the 40b model:
+```
+python -m evo2.test.test_evo2_generation --model_name evo2_40b
+```
+
 ### Docker
 
 Evo 2 can be run using Docker (shown below), Singularity, or Apptainer.
@@ -94,24 +101,20 @@ Once inside the container:
 python -m evo2.test.test_evo2_generation --model_name evo2_7b
 ```
 
-## Checkpoints
+## Usage
+
+### Checkpoints
 
 We provide the following model checkpoints, hosted on [HuggingFace](https://huggingface.co/arcinstitute):
 | Checkpoint Name                        | Description |
 |----------------------------------------|-------------|
-| `evo2_40b`  | A model pretrained with 1 million context obtained through context extension of `evo2_40b_base`.|
-| `evo2_7b`  | A model pretrained with 1 million context obtained through context extension of `evo2_7b_base`.|
-| `evo2_40b_base`  | A model pretrained with 8192 context length.|
-| `evo2_7b_base`  | A model pretrained with 8192 context length.|
-| `evo2_1b_base`  | A smaller model pretrained with 8192 context length.|
+| `evo2_7b`  | 7B parameter model with 1M context |
+| `evo2_40b`  | 40B parameter model with 1M context (requires multiple GPUs) |
+| `evo2_7b_base`  | 7B parameter model with 8K context |
+| `evo2_40b_base`  | 40B parameter model with 8K context |
+| `evo2_1b_base`  | Smaller 1B parameter model with 8K context |
 
-To use Evo 2 40B, you will need multiple GPUs. Vortex automatically handles device placement, splitting the model across available cuda devices.
-
-Note that the 7B checkpoints can be run without FP8, thus avoiding the compute capability requirement. This can be done by modifying the configs to turn off FP8 and is not officially supported as there are numerical differences.
-
-## Usage
-
-Below are simple examples of how to download Evo 2 and use it locally in Python.
+**Note:** The 40B model requires multiple GPUs. Vortex automatically handles device placement, splitting the model across available CUDA devices.
 
 ### Forward
 
@@ -173,11 +176,11 @@ output = evo2_model.generate(prompt_seqs=["ACGT"], n_tokens=400, temperature=1.0
 print(output.sequences[0])
 ```
 
-### Notebooks
+## Notebooks
 
 We provide example notebooks.
 
-The [BRCA1 notebook](https://github.com/ArcInstitute/evo2/blob/main/notebooks/brca1/brca1_zero_shot_vep.ipynb) shows zero-shot *BRCA1* variant effect prediction. This example includes a walkthrough of:
+The [BRCA1 scoring notebook](https://github.com/ArcInstitute/evo2/blob/main/notebooks/brca1/brca1_zero_shot_vep.ipynb) shows zero-shot *BRCA1* variant effect prediction. This example includes a walkthrough of:
 - Performing zero-shot *BRCA1* variant effect predictions using Evo 2
 - Reference vs alternative allele normalization
 
@@ -185,7 +188,16 @@ The [generation notebook](https://github.com/ArcInstitute/evo2/blob/main/noteboo
 - DNA prompt based generation and 'DNA autocompletion'
 - How to get and prompt using phylogenetic species tags for generation
 
-### Nvidia NIM
+The [exon classifier notebook](https://github.com/ArcInstitute/evo2/blob/main/notebooks/exon_classifier/exon_classifier.ipynb) demonstrates exon classification using Evo 2 embeddings. This example shows:
+- Running the Evo 2 based exon classifier
+- Performance metrics and visualization
+
+The [sparse autoencoder (SAE) notebook](https://github.com/ArcInstitute/evo2/blob/main/notebooks/sparse_autoencoder/sparse_autoencoder.ipynb) explores interpretable features learned by Evo 2. This example includes:
+- Running and visualizing Evo 2 SAE features
+- Demonstrating SAE features on a part of the *E. coli* genome
+
+
+## Nvidia NIM
 
 Evo 2 is available on [Nvidia NIM](https://catalog.ngc.nvidia.com/containers?filters=&orderBy=scoreDESC&query=evo2&page=&pageSize=) and [hosted API](https://build.nvidia.com/arc/evo2-40b).
 
@@ -227,13 +239,13 @@ else:
 
 ### Very long sequences
 
-You can use [Savanna](https://github.com/Zymrael/savanna) or [Nvidia BioNemo](https://github.com/NVIDIA/bionemo-framework) for embedding long sequences. Vortex can currently compute over very long sequences via teacher prompting, however please note that forward pass on long sequences may currently be slow. 
+You can use [Savanna](https://github.com/Zymrael/savanna) or [Nvidia BioNemo](https://github.com/NVIDIA/bionemo-framework) for embedding long sequences. Vortex can currently compute over very long sequences via teacher prompting, however please note that forward pass on long sequences may currently be slow.
 
-### Dataset
+## Dataset
 
 The OpenGenome2 dataset used for pretraining Evo2 is available on [HuggingFace ](https://huggingface.co/datasets/arcinstitute/opengenome2). Data is available either as raw fastas or as JSONL files which include preprocessing and data augmentation.
 
-### Training and Finetuning
+## Training and Finetuning
 
 Evo 2 was trained using [Savanna](https://github.com/Zymrael/savanna), an open source framework for training alternative architectures.
 
