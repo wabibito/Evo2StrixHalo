@@ -4,12 +4,13 @@
 
 Evo 2 is a state of the art DNA language model for long context modeling and design. Evo 2 models DNA sequences at single-nucleotide resolution at up to 1 million base pair context length using the [StripedHyena 2](https://github.com/Zymrael/savanna/blob/main/paper.pdf) architecture. Evo 2 was pretrained using [Savanna](https://github.com/Zymrael/savanna). Evo 2 was trained autoregressively on [OpenGenome2](https://huggingface.co/datasets/arcinstitute/opengenome2), a dataset containing 8.8 trillion tokens from all domains of life.
 
-We describe Evo 2 in the preprint:
-["Genome modeling and design across all domains of life with Evo 2"](https://www.biorxiv.org/content/10.1101/2025.02.18.638918v1).
+We describe Evo 2 in our paper:
+["Genome modeling and design across all domains of life with Evo 2"](https://www.nature.com/articles/s41586-026-10176-5).
 
 > [!NOTE]
-> - **New Evo 2 20B checkpoint**: 40B-level performance with double the speed, read more [here](https://github.com/ArcInstitute/evo2/releases/tag/v0.5.0).
-> - **Light install for 7B models**: installation option compatible with more hardware, see [Installation](#installation).
+> - **Evo 2 published**: read more in [Nature](https://www.nature.com/articles/s41586-026-10176-5).
+> - **Evo 2 20B released**: 40B-level performance with double the speed, read more [here](https://github.com/ArcInstitute/evo2/releases/tag/v0.5.0).
+> - **Light install for 7B models**: option compatible with more hardware, see [Installation](#installation).
 
 ## Contents
 
@@ -45,7 +46,8 @@ Evo 2 is built on the Vortex inference repo, see the [Vortex github](https://git
 	- CUDA: 12.1+ with compatible NVIDIA drivers
 	- cuDNN: 9.3+
 	- Compiler: GCC 9+ or Clang 10+ with C++17 support
-	- Python 3.12 required
+	- Python 3.11 or 3.12
+- Recommended Torch 2.6.x or 2.7.x
 
 **FP8 and Transformer Engine requirements**
 
@@ -74,8 +76,10 @@ pip install evo2
 
 **Light install (7B models only, no Transformer Engine)**
 
-Evo 2 7B models can run without Transformer Engine or FP8-capable hardware. If you run into issues installing Flash Attention, see the [Flash Attention GitHub](https://github.com/Dao-AILab/flash-attention/tree/main) for system requirements and troubleshooting:
+Evo 2 7B models can run without Transformer Engine or FP8-capable hardware. If you run into issues installing Flash Attention, see the [Flash Attention GitHub](https://github.com/Dao-AILab/flash-attention/tree/main) for system requirements and troubleshooting.
+
 ```bash
+# A compatible PyTorch must be installed before flash attention, for example: pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
 pip install flash-attn==2.8.0.post2 --no-build-isolation
 pip install evo2
 ```
@@ -268,16 +272,13 @@ To train or finetune Evo 2, you can use [Savanna](https://github.com/Zymrael/sav
 If you find these models useful for your research, please cite the relevant papers
 
 ```
-@article {Brixi2025.02.18.638918,
-	author = {Brixi, Garyk and Durrant, Matthew G and Ku, Jerome and Poli, Michael and Brockman, Greg and Chang, Daniel and Gonzalez, Gabriel A and King, Samuel H and Li, David B and Merchant, Aditi T and Naghipourfar, Mohsen and Nguyen, Eric and Ricci-Tam, Chiara and Romero, David W and Sun, Gwanggyu and Taghibakshi, Ali and Vorontsov, Anton and Yang, Brandon and Deng, Myra and Gorton, Liv and Nguyen, Nam and Wang, Nicholas K and Adams, Etowah and Baccus, Stephen A and Dillmann, Steven and Ermon, Stefano and Guo, Daniel and Ilango, Rajesh and Janik, Ken and Lu, Amy X and Mehta, Reshma and Mofrad, Mohammad R.K. and Ng, Madelena Y and Pannu, Jaspreet and Re, Christopher and Schmok, Jonathan C and St. John, John and Sullivan, Jeremy and Zhu, Kevin and Zynda, Greg and Balsam, Daniel and Collison, Patrick and Costa, Anthony B. and Hernandez-Boussard, Tina and Ho, Eric and Liu, Ming-Yu and McGrath, Tom and Powell, Kimberly and Burke, Dave P. and Goodarzi, Hani and Hsu, Patrick D and Hie, Brian},
-	title = {Genome modeling and design across all domains of life with Evo 2},
-	elocation-id = {2025.02.18.638918},
-	year = {2025},
-	doi = {10.1101/2025.02.18.638918},
-	publisher = {Cold Spring Harbor Laboratory},
-	URL = {https://www.biorxiv.org/content/early/2025/02/21/2025.02.18.638918},
-	eprint = {https://www.biorxiv.org/content/early/2025/02/21/2025.02.18.638918.full.pdf},
-	journal = {bioRxiv}
+@article{Brixi2026,
+    author  = {Brixi, Garyk and Durrant, Matthew G. and Ku, Jerome and Naghipourfar, Mohsen and Poli, Michael and Sun, Gwanggyu and Brockman, Greg and Chang, Daniel and Fanton, Alison and Gonzalez, Gabriel A. and King, Samuel H. and Li, David B. and Merchant, Aditi T. and Nguyen, Eric and Ricci-Tam, Chiara and Romero, David W. and Schmok, Jonathan C. and Taghibakhshi, Ali and Vorontsov, Anton and Yang, Brandon and Deng, Myra and Gorton, Liv and Nguyen, Nam and Wang, Nicholas K. and Pearce, Michael T. and Simon, Elana and Adams, Etowah and Amador, Zachary J. and Ashley, Euan A. and Baccus, Stephen A. and Dai, Haoyu and Dillmann, Steven and Ermon, Stefano and Guo, Daniel and Herschl, Michael H. and Ilango, Rajesh and Janik, Ken and Lu, Amy X. and Mehta, Reshma and Mofrad, Mohammad R. K. and Ng, Madelena Y. and Pannu, Jaspreet and Ré, Christopher and St. John, John and Sullivan, Jeremy and Tey, Joseph and Viggiano, Ben and Zhu, Kevin and Zynda, Greg and Balsam, Daniel and Collison, Patrick and Costa, Anthony B. and Hernandez-Boussard, Tina and Ho, Eric and Liu, Ming-Yu and McGrath, Thomas and Powell, Kimberly and Pinglay, Sudarshan and Burke, Dave P. and Goodarzi, Hani and Hsu, Patrick D. and Hie, Brian L.},
+    title   = {Genome modelling and design across all domains of life with Evo 2},
+    journal = {Nature},
+    year    = {2026},
+    doi     = {10.1038/s41586-026-10176-5},
+    url     = {https://doi.org/10.1038/s41586-026-10176-5},
 }
 ```
 
