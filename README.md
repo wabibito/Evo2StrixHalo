@@ -93,6 +93,12 @@ Because this has not run on a 395 yet, the likely first-iteration issues are:
 
 Run the scripts, capture the output, and the port can be fixed from there.
 
+**Follow [`docs/TESTING_PLAN.md`](docs/TESTING_PLAN.md)** — a phase-by-phase
+bring-up plan with the exact commands, expected outputs, reference numbers, and
+a known-risk register. It is written so that, on a fresh checkout on the 395,
+you (or an assistant) can run a phase, paste the output, and continue debugging
+from a known state.
+
 ## Credits
 
 Evo 2 is by the Arc Institute. The FP8-on-non-FP8-hardware approach and the
