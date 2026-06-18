@@ -52,7 +52,7 @@ use_fp8_input_projections: True
 max_seqlen: 8192
 max_batch_size: 1
 final_norm: True 
-use_flash_attn: True
+use_flash_attn: False  # Evo2StrixHalo: flash-attn not available on gfx1151 (ROCm); SDPA fallback
 use_flash_rmsnorm: False
 use_flash_depthwise: False
 use_flashfft: False

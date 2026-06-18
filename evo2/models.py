@@ -23,6 +23,45 @@ from vortex.model.utils import dotdict, print_rank_0, load_checkpoint
 from evo2.scoring import score_sequences, score_sequences_rc
 from evo2.utils import MODEL_NAMES, HF_MODEL_NAME_MAP, CONFIG_MAP
 
+# FP8-trained checkpoints where e4m3 emulation measurably recovers accuracy on
+# hardware without FP8 tensor cores (Strix Halo / RDNA, Apple Silicon). The 7B
+# checkpoints are bf16-robust, so emulation is not applied to them.
+FP8_EMULATION_DEFAULT_MODELS = {"evo2_1b_base"}
+
+
+def _is_rocm() -> bool:
+    """True when PyTorch is built for AMD ROCm/HIP. ROCm presents through the
+    CUDA API (``torch.cuda.is_available()`` is True), but ``torch.version.hip``
+    is set."""
+    return bool(getattr(torch.version, "hip", None))
+
+
+def _has_fp8_hardware() -> bool:
+    """True only on accelerators with native FP8 tensor cores that Transformer
+    Engine can target: NVIDIA compute capability >= 8.9 (Ada/Hopper/Blackwell),
+    or AMD CDNA3 (MI300-class). RDNA 3.5 (Strix Halo, gfx1151) has no FP8
+    hardware, so this returns False there and the bf16 + emulation path is used."""
+    if not torch.cuda.is_available():
+        return False
+    if _is_rocm():
+        try:
+            name = torch.cuda.get_device_name(0).lower()
+            return any(t in name for t in ("mi300", "mi325", "gfx94"))
+        except Exception:
+            return False
+    try:
+        return torch.cuda.get_device_capability(0) >= (8, 9)
+    except Exception:
+        return False
+
+
+def _get_default_device() -> str:
+    # ROCm and CUDA both report through torch.cuda; CPU is the last resort.
+    if torch.cuda.is_available():
+        return "cuda:0"
+    return "cpu"
+
+
 class Evo2:
     def __init__(self, model_name: str = MODEL_NAMES[1], local_path: str = None):
         """
@@ -53,9 +92,50 @@ class Evo2:
             self.model = self.load_evo2_model(None, config_path, local_path)
         else:
             self.model = self.load_evo2_model(model_name, config_path)
-        
+
         self.tokenizer = CharLevelTokenizer(512)
-    
+        self.device = _get_default_device()
+
+        # On hardware without FP8 tensor cores (Strix Halo / RDNA, or any GPU
+        # below compute capability 8.9), Transformer Engine is unavailable and
+        # FP8-trained checkpoints load with bf16 projections. For such models we
+        # apply an e4m3 emulation of TE's per-tensor input projections, which
+        # recovers most of the accuracy lost to the bf16 fallback. The 7B
+        # checkpoints are bf16-native and are excluded by default.
+        flag = os.environ.get("EVO2_FP8_EMULATION")
+        helps_by_default = (model_name or "") in FP8_EMULATION_DEFAULT_MODELS
+        want_emulation = flag == "1" or (flag != "0" and helps_by_default)
+        if want_emulation and not _has_fp8_hardware() and not HAS_TE:
+            try:
+                from evo2.fp8_emulation import apply_fp8_emulation
+                ckpt = self._resolve_checkpoint_path(model_name, local_path)
+                if ckpt is not None:
+                    n = apply_fp8_emulation(self.model, ckpt)
+                    if n:
+                        warnings.warn(
+                            f"Applied FP8 e4m3 emulation to {n} input projection(s) "
+                            f"for '{model_name}' (no FP8 hardware / Transformer Engine)."
+                        )
+            except Exception as e:  # never block model load on emulation
+                warnings.warn(f"FP8 emulation could not be applied: {e}")
+
+    @staticmethod
+    def _resolve_checkpoint_path(model_name, local_path):
+        """Locate the merged .pt the model was loaded from, for FP8 scale
+        recovery. Mirrors load_evo2_model's path logic."""
+        if local_path is not None:
+            return local_path
+        if model_name is None:
+            return None
+        filename = f"{model_name}.pt"
+        cached = os.path.join(os.path.dirname(constants.HF_HUB_CACHE), filename)
+        if os.path.exists(cached):
+            return cached
+        import glob
+        hits = glob.glob(os.path.expanduser(f"~/.cache/huggingface/**/{filename}"),
+                         recursive=True)
+        return hits[0] if hits else None
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -196,20 +276,14 @@ class Evo2:
             config = dotdict(config)
 
             if config.get("use_fp8_input_projections", False) and not HAS_TE:
-                is_7b_model = "7b" in (model_name or "") or "7b" in (config_path or "")
-                if is_7b_model:
-                    warnings.warn(
-                        "Transformer Engine not installed. "
-                        "Falling back to bf16 projections (use_fp8_input_projections=False). "
-                    )
-                    config.use_fp8_input_projections = False
-                else:
-                    raise ImportError(
-                        f"Model '{model_name or config_path}' requires FP8 via Transformer Engine, "
-                        f"which is not installed.\n"
-                        f"Install with: pip install transformer_engine\n"
-                        f"For inference without TE, use any 7b model: Evo2('evo2_7b')"
-                    )
+                # No Transformer Engine (Strix Halo / RDNA, or any non-FP8 GPU):
+                # load every checkpoint with bf16 projections. FP8-trained models
+                # get e4m3 emulation applied after load (see Evo2.__init__).
+                warnings.warn(
+                    "Transformer Engine not installed. Loading bf16 projections; "
+                    "FP8-trained checkpoints get e4m3 emulation applied after load."
+                )
+                config.use_fp8_input_projections = False
 
             model = StripedHyena(config)
             load_checkpoint(model, local_path)
@@ -278,19 +352,13 @@ class Evo2:
         global_config = dotdict(config, Loader=yaml.FullLoader)
 
         if global_config.get("use_fp8_input_projections", False) and not HAS_TE:
-            if "7b" in (model_name or ""):
-                warnings.warn(
-                    "Transformer Engine not installed. "
-                    "Falling back to bf16 projections (use_fp8_input_projections=False). "
-                )
-                global_config.use_fp8_input_projections = False
-            else:
-                raise ImportError(
-                    f"Model '{model_name}' requires FP8 via Transformer Engine, "
-                    f"which is not installed.\n"
-                    f"Install with: pip install transformer_engine\n"
-                    f"For inference without TE, use any 7b model: Evo2('evo2_7b')"
-                )
+            # No Transformer Engine: load bf16 projections for every model; FP8
+            # emulation is applied after load (see Evo2.__init__).
+            warnings.warn(
+                "Transformer Engine not installed. Loading bf16 projections; "
+                "FP8-trained checkpoints get e4m3 emulation applied after load."
+            )
+            global_config.use_fp8_input_projections = False
 
         model = StripedHyena(global_config)
         load_checkpoint(model, weights_path)
