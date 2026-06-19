@@ -61,6 +61,21 @@ python scripts/test_dna.py --model evo2_7b_base
 python scripts/verify_all.py
 ```
 
+## Web UI
+
+A Gradio app (`webapp.py`) exposes the model in the browser — a **Generate** tab
+(continue a DNA prompt) and a **Score** tab (per-base log-likelihood):
+
+```bash
+python webapp.py            # http://127.0.0.1:7860  (--host/--port/--share)
+```
+
+Models load lazily and one-at-a-time (the first request downloads + loads; later
+requests reuse it). It offers `evo2_1b_base` (FP8-emulated, fast) and
+`evo2_7b_base` (bf16-native, accurate); the 20B/40B are omitted as they are not
+numerically usable without FP8 hardware. Runs on the iGPU automatically
+(`HSA_OVERRIDE_GFX_VERSION=11.5.1` is set by the app if unset).
+
 `install.sh` creates a venv, installs the `gfx1151` PyTorch ROCm wheels
 (`https://rocm.nightlies.amd.com/v2/gfx1151/`, overridable via
 `EVO2_TORCH_INDEX`), installs `vtx` and this package, then applies the vortex
