@@ -26,7 +26,8 @@ requires CDNA3/MI300 on AMD, or NVIDIA Ada/Hopper. So:
 |-----------|---------------|
 | `evo2_7b`, `evo2_7b_base` (8K) | **bf16-native — the accurate workhorse.** RDNA 3.5 runs bf16 well, and these ship with FP8 off. |
 | `evo2_1b_base` | FP8-trained; loads with **e4m3 emulation** of the input projections (recovers most accuracy lost to bf16). |
-| `evo2_20b`, `evo2_40b` | **Not numerically usable.** FP8-trained across ~120 layers; without FP8 hardware they are near-random in bf16, and emulation cannot recover them. They may load (memory permitting) but should not be trusted. |
+| `evo2_20b` | **Loads and runs, but not numerically usable** (~24% next-token acc vs the 91.7% H100 ref — chance for 4-base DNA). FP8 across 117 layers; emulating the linears (any precision/scale, and a CPU native-`float8_e4m3fn` reference) leaves it at chance, so its FP8 dependence is in the attention/fused stack, not the linears. Not recoverable by emulation. |
+| `evo2_40b` | Same numerical outcome as the 20B, and additionally storage-bound on a consumer device (sharded checkpoint merges to ~80 GB, ~165 GB peak working disk). |
 
 This is the same FP8 hardware boundary that affects Apple Silicon — it is not
 specific to AMD.
@@ -95,9 +96,17 @@ emulation is the only path. See the
 [FP8-ROCM technical paper](https://github.com/wabibito/FP8-ROCM/blob/main/docs/PAPER.md)
 for the full study.
 
-Emulation does **not** rescue the 20B/40B (their outlier-heavy activations over
-~120 FP8 layers cannot be reproduced in higher precision — see the
-[Evo2MPS paper](https://github.com/wabibito/Evo2MPS/blob/main/docs/PAPER.md)).
+Emulation does **not** rescue the 20B/40B. The 20B is FP8 across 117 layers, and
+emulating those linears leaves it at chance (~24% vs 91.7%) under every
+configuration tested — bf16/fp32 grid, bf16/fp32 accumulation,
+checkpoint/dynamic activation scales, and any layer subset. The decisive control:
+running the whole 20B on **CPU** with PyTorch's **native `float8_e4m3fn`** cast
+(the exact FP8 arithmetic an H100 performs) also gives chance, so it is neither a
+ROCm artifact nor an emulation-fidelity gap. The 20B's FP8 dependence lives in
+the attention/fused stack, not the linear GEMMs, and cannot be reconstructed by
+replacing `nn.Linear` modules — these models require true FP8 hardware. See
+[`scripts/sweep_fp8.py`](scripts/sweep_fp8.py) and the
+[FP8-ROCM paper §5.6](https://github.com/wabibito/FP8-ROCM/blob/main/docs/PAPER.md).
 
 ## Hardware status
 
