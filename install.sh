@@ -75,6 +75,13 @@ fi
 # 5. Editable install of the evo2 package (no deps; keep our patched source)
 log "installing local Evo2StrixHalo package (editable, no deps)..."
 pip install --no-deps -e "$REPO_ROOT"
+# FP8-ROCM: the e4m3 emulation library evo2/fp8_emulation.py delegates to (bf16
+# matrix-core GEMM — faster and more accurate than the in-repo fallback). Sibling
+# checkout next to this repo; skipped gracefully if absent.
+if [[ -d "$REPO_ROOT/../FP8-ROCM" ]]; then
+  log "installing FP8-ROCM (editable, no deps)..."
+  pip install --no-deps -e "$REPO_ROOT/../FP8-ROCM"
+fi
 pip install biopython huggingface_hub pyyaml "einops>=0.8" packaging rich tqdm numpy
 pip install pandas openpyxl   # BRCA1 VEP / batch scoring
 pip install "gradio>=4.0,<6"  # webapp.py

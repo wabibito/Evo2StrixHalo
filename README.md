@@ -71,27 +71,46 @@ are skipped because ROCm presents through the CUDA API natively.
 
 The 1B (and, in principle, the 20B/40B) are loaded with bf16 projections and
 then have NVIDIA Transformer Engine's per-tensor e4m3 input-projection GEMM
-**emulated** in pure PyTorch (`evo2/fp8_emulation.py`). The emulation is
-device-agnostic and bit-exact against `torch.float8_e4m3fn`. It is applied
-automatically for `evo2_1b_base`; control it with `EVO2_FP8_EMULATION=0/1`.
+**emulated** in pure PyTorch. `evo2/fp8_emulation.py` recovers the per-layer
+scales from the checkpoint's TE `_extra_state` and delegates the linear-layer
+emulation to the [FP8-ROCM](https://github.com/wabibito/FP8-ROCM) package
+(`Fp8TELinear`, bf16 matrix-core GEMM), falling back to an in-repo
+implementation if FP8-ROCM is not installed. Applied automatically for
+`evo2_1b_base`; control it with `EVO2_FP8_EMULATION=0/1`.
 
-This recovers the 1B from near-random to roughly 75% next-token accuracy. It
-does **not** rescue the 20B/40B (their outlier-heavy activations over ~120 FP8
-layers cannot be reproduced in higher precision — see the
+**Validated on Strix Halo (Radeon 8060S, gfx1151, ROCm 7.2.4):**
+
+| Model | Path | Next-token acc | vs H100 ref |
+|---|---|---|---|
+| `evo2_7b_base` | bf16-native | 85.98% | +0.06 pp (essentially exact) |
+| `evo2_1b_base` | bf16 fallback (no FP8) | 32.57% | -46.99 pp |
+| `evo2_1b_base` | **e4m3 emulation (bf16)** | **78.68%** | **-0.87 pp** |
+
+The consistent-bf16 emulation matches the operator the checkpoint was calibrated
+against (vortex's bf16 forward) and runs on the iGPU's matrix cores, so it is
+both faster (~15x on the projection GEMM) and ~10 pp more accurate than a
+mixed-precision or fp32 emulation. `torch._scaled_mm` is unavailable on gfx1151
+(MI300+/Hopper only), and RDNA 3.5 has no FP8 WMMA units (those are RDNA 4), so
+emulation is the only path. See the
+[FP8-ROCM technical paper](https://github.com/wabibito/FP8-ROCM/blob/main/docs/PAPER.md)
+for the full study.
+
+Emulation does **not** rescue the 20B/40B (their outlier-heavy activations over
+~120 FP8 layers cannot be reproduced in higher precision — see the
 [Evo2MPS paper](https://github.com/wabibito/Evo2MPS/blob/main/docs/PAPER.md)).
 
-## What still needs validating on real hardware
+## Hardware status
 
-Because this has not run on a 395 yet, the likely first-iteration issues are:
+Brought up and validated on a Ryzen AI Max+ 395 (Radeon 8060S, gfx1151) with
+ROCm 7.2.4 and the gfx1151 PyTorch wheel (torch 2.11.0+rocm7.13): the 1B and 7B
+load and run on the iGPU, the flash-attn vortex patches are sufficient, and the
+FP8 results above match the H100 reference. Remaining items to watch:
 
-1. The `gfx1151` PyTorch wheel index / ROCm version in `install.sh`.
-2. Which vortex patches ROCm actually needs (the script applies the flash-attn
-   subset; if a forward pass fails on a CUDA-API call, re-run
-   `python patches/patch_vortex.py --backend mps` for the broader set).
-3. Whether `vtx`/`vortex` builds any CUDA-only kernels that need ROCm equivalents.
-4. Memory behaviour for the 7B/20B under ROCm's unified-memory model.
-
-Run the scripts, capture the output, and the port can be fixed from there.
+1. Memory behaviour for the 20B under ROCm's unified-memory model.
+2. MIOpen emits a benign missing-tuning-DB warning on first FFT prefill; it falls
+   back correctly.
+3. The `gfx1151` wheel index in `install.sh` tracks AMD nightlies and may need a
+   version bump over time.
 
 **Follow [`docs/TESTING_PLAN.md`](docs/TESTING_PLAN.md)** — a phase-by-phase
 bring-up plan with the exact commands, expected outputs, reference numbers, and
